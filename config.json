@@ -1,0 +1,10 @@
+{
+  "port": 6001,
+  "notificationServerUrl": "https://sdntest.geco.com.ar",
+  "idAplicacion": 13,
+  "name": "Helpdesk Geco",
+  "lastMessage": "",
+  "webhookToken": "miTokenPersonal",
+  "access_token_facebook": "EAAFhIdqdFt8BOwczlW8IYtbFnMpc4K1Lydz5gNSQKFfnZBG0QosdxUCAZC1SzvNCxLlqKQUirH1uiqbtoKHfqqXEWiX2Petl9ID5rb3UoeNSCokI43OV06Ty0GRiUZCQjM14Gb8ddjAt1NfljMp7E4VJ9xNJPSkDmWCUkgA5wtzckN8mHsDSQlY7gqtyXbnewZA97MYbkwEqFgZDZD",
+  "access_token_instagram": "EAAFhIdqdFt8BO1j5BoBFxdwku3q0R5ZBOwNmovO3yOiJaaYwPIv9sJFJPhkLwDIqORZBaZCpnHRd51mPKoNmYMzjZCCBj63PAPkKZCDQ6JZAFoT1bsKz9EuXYMpcezmZARgq8dQaH1nqK1esuJIKJL2VWyqyzZBPtp5oRGNZBs4MDxVNFiqk8QfROoF8LaPY12Af9Qx7duHrPeDG4pAZDZD"
+}
