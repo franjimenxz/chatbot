@@ -228,7 +228,7 @@ async def getContactInfo(senderID: str):
     Para obtener información, se usa por defecto el token de Facebook.
     """
     url = f"https://graph.facebook.com/v15.0/{senderID}"
-    token = config.get("access_token_facebook")  # Puedes ajustar esto si es necesario
+    token = config.get("access_token_instagram")  # Puedes ajustar esto si es necesario
     params = {"fields": "name", "access_token": token}
     async with httpx.AsyncClient() as client:
         try:
