@@ -41,8 +41,7 @@ async def verify_webhook(
     hub_verify_token: str = Query(..., alias="hub.verify_token"),
     hub_challenge: str = Query(..., alias="hub.challenge")
 ):
-    # AJUSTE: Usamos "webhook_token" del nuevo config.json
-    if hub_verify_token == config["webhook_token"]:
+    if hub_verify_token == config["webhookToken"]:
         logging.info("webhook verificado!")
         return PlainTextResponse(content=hub_challenge, status_code=200)
     else:
@@ -53,7 +52,7 @@ async def verify_webhook(
 async def webhook(request: Request):
     body = await request.json()
     logging.info("request: " + json.dumps(body))
-    
+    # Determinar la plataforma: "page" para Messenger, "instagram" para Instagram Direct
     platform = body.get("object")
     if platform in ["page", "instagram"]:
         entries = body.get("entry", [])
@@ -68,28 +67,25 @@ async def webhook(request: Request):
                     await process_event(event, platform)
                 elif "read" in event:
                     await sendWebhookChangeState(event["read"].get("mid"), ESTADOSSDN["LEIDO"])
-    
+        return Response(status_code=200)
     return Response(status_code=200)
 
 @app.get("/send")
-async def send_endpoint(number: str = Query(...), message: str = Query(...), platform: str = Query("instagram")):
-    logging.info(f"{datetime.now()}: SEND - Numero: {number}. Mensaje: {message} a plataforma {platform}")
-    # AJUSTE: Ahora se puede especificar la plataforma para pruebas
-    await sendMessage(number, message, platform)
+async def send_endpoint(number: str = Query(...), message: str = Query(...)):
+    logging.info(f"{datetime.now()}: SEND - Numero: {number}. Mensaje: {message}")
+    # Para pruebas manuales, usamos por defecto el token de Facebook ("page")
+    await sendMessage(number, message, "page")
     return {"status": "OK", "message": "Sent"}
 
 # Modelo para la petición de envío de mensaje
 class SendMessageRequest(BaseModel):
     to: str
     body: str
-    # AJUSTE: Opcional para especificar la plataforma desde el cuerpo de la petición
-    platform: str = "instagram"
 
 @app.post("/sendMessage")
 async def send_message_endpoint(req: SendMessageRequest):
     if req:
-        # AJUSTE: Pasamos la plataforma a la función de envío
-        await sendMessage(req.to, req.body, req.platform)
+        await sendPlainMessage(req)
         return {"status": "OK", "message": "Sent"}
     else:
         return {"status": "ERROR", "message": "Bad request: body faltante"}
@@ -101,6 +97,7 @@ async def send_message_endpoint(req: SendMessageRequest):
 async def process_event(event: dict, platform: str):
     """
     Procesa el evento recibido desde el webhook para Facebook o Instagram.
+    Extrae el mensaje y, si es "!ping", responde con "pong".
     """
     message = {}
     if "message" in event:
@@ -112,27 +109,26 @@ async def process_event(event: dict, platform: str):
     elif "postback" in event:
         message["mid"] = event["postback"].get("mid")
         message["body"] = event["postback"].get("title")
-    
     message["from"] = event["sender"]["id"]
 
     if message.get("body"):
         if message["body"] == "!ping":
             await sendMessage(message["from"], "pong", platform)
         else:
-            data = await getDataFromMessage(message, platform)
+            data = await getDataFromMessage(message)
             logging.info(f"{datetime.now()}: RECEIVE ({platform}) - senderID: {message['from']}. Mensaje: {message['body']}")
             await sendToNotification(data)
 
-async def getDataFromMessage(message: dict, platform: str) -> dict:
+async def getDataFromMessage(message: dict) -> dict:
     """
-    Arma la data que se enviará a notificación.
+    Arma la data que se enviará a notificación,
+    obteniendo información de contacto y detalles del mensaje.
     """
-    # AJUSTE: Pasamos la plataforma a getContactInfo
-    contacto = await getContactInfo(message["from"], platform)
+    contacto = await getContactInfo(message["from"])
     data = {
         "idAplicacion": config["idAplicacion"],
         "numeroWhatsappCliente": message["from"],
-        "nombreAutor": contacto.get("name") if contacto else "Usuario",
+        "nombreAutor": contacto.get("name") if contacto else "test",
         "infoMensaje": await getMessageInfo(message)
     }
     return data
@@ -149,73 +145,100 @@ async def getMessageInfo(message: dict) -> dict:
     return messageInfo
 
 async def sendToNotification(data: dict):
-    # (Esta función no necesita cambios, está bien como estaba)
-    ...
+    """
+    Envía la data del mensaje a la URL de notificación.
+    Si 'notificationServerUrl' no está configurado, solo se loguea la data.
+    """
+    data["idCanal"] = 2
+    if not config.get("notificationServerUrl"):
+        logging.info(f"No se envía notificación ya que 'notificationServerUrl' no está configurado. Data: {json.dumps(data)}")
+        return
+    notification_url = f"{config['notificationServerUrl']}/whatsapp/service/mensaje"
+    logging.info(f"{datetime.now()}: Enviamos a {notification_url}. Data: {json.dumps(data)}")
+    async with httpx.AsyncClient() as client:
+        try:
+            res = await client.post(notification_url, json=data)
+            logging.info(f"{datetime.now()}: Respuesta OK - Response: {res.text}")
+        except Exception as e:
+            logging.error(f"{datetime.now()}: Respuesta ERROR - Response: {str(e)}")
 
 async def sendWebhookChangeState(idWhatsapp, idEstado):
-    # (Esta función no necesita cambios, está bien como estaba)
-    ...
+    """
+    Envía un cambio de estado (por ejemplo, mensaje eliminado o leído) a la URL de notificación.
+    Si 'notificationServerUrl' no está configurado, solo se loguea la acción.
+    Si la respuesta no es 200, reintenta la petición luego de 10 segundos.
+    """
+    if not config.get("notificationServerUrl"):
+        logging.info(f"No se envía cambio de estado ya que 'notificationServerUrl' no está configurado. idWhatsapp: {idWhatsapp}, idEstado: {idEstado}")
+        return
+    url = f"{config['notificationServerUrl']}/mensaje/cambiarEstadoWebhook"
+    logging.info(f"Webhook: {url} id: {idWhatsapp} ack: {idEstado}")
+    jsonRequest = {
+        "idWhatsapp": idWhatsapp,
+        "idEstado": idEstado
+    }
+    async with httpx.AsyncClient() as client:
+        try:
+            res = await client.post(url, json=jsonRequest)
+            if res.status_code != 200:
+                await asyncio.sleep(10)
+                await sendWebhookChangeState(idWhatsapp, idEstado)
+        except Exception as e:
+            logging.error(f"Error sending webhook change state: {str(e)}")
+            await asyncio.sleep(10)
+            await sendWebhookChangeState(idWhatsapp, idEstado)
 
+async def sendPlainMessage(requestBody: SendMessageRequest):
+    """
+    Envía un mensaje de texto plano.
+    """
+    number = requestBody.to
+    mensaje = requestBody.body
+    if mensaje:
+        logging.info(f"{datetime.now()}: SEND - Numero: {number}. Mensaje: {mensaje}")
+        # Para envíos manuales, usamos por defecto el token de Facebook ("page")
+        await sendMessage(number, mensaje, "page")
 
 async def sendMessage(senderID: str, mensaje: str, platform: str):
     """
     Envía un mensaje usando la SendAPI de Facebook.
-    Usa el único Page Access Token para todas las plataformas.
+    Selecciona el token adecuado según la plataform23 a.
     """
     request_body = {
         "recipient": {"id": senderID},
-        "message": {"text": mensaje},
-        "messaging_type": "RESPONSE" # Recomendado para respuestas a mensajes de usuario
+        "message": {"text": mensaje}
     }
-    
-    # CORRECCIÓN: La API de Mensajería para Instagram y Facebook usa el mismo dominio.
-    # CORRECCIÓN: Usamos una versión de la API más reciente. v15.0 está obsoleta.
-    url = "https://graph.facebook.com/v19.0/me/messages"
-    
-    # AJUSTE: Simplificado. Usamos un único token para todo.
-    token = config.get("page_access_token")
-    if not token:
-        logging.error("¡ERROR! 'page_access_token' no está configurado en config.json")
-        return
-        
+    url = "https://graph.facebook.com/v15.0/me/messages"
+    if platform == "page":
+        token = config.get("access_token_facebook")
+    elif platform == "instagram":
+        token = config.get("access_token_instagram")
+    else:
+        token = config.get("access_token")
     params = {"access_token": token}
-    
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.post(url, params=params, json=request_body)
-            response.raise_for_status() # Lanza un error si la respuesta no es 2xx
-            logging.info(f"Mensaje enviado a {senderID}. Respuesta: {response.json()}")
-        except httpx.HTTPStatusError as e:
-            logging.error(f"Error enviando mensaje a {senderID}: {e.response.status_code} - {e.response.text}")
+            await client.post(url, params=params, json=request_body)
         except Exception as e:
-            logging.error(f"Error inesperado enviando mensaje: {str(e)}")
+            logging.error(f"Error sending message: {str(e)}")
 
-async def getContactInfo(senderID: str, platform: str):
+async def getContactInfo(senderID: str):
     """
     Obtiene la información de contacto del remitente usando la API de Facebook.
+    Para obtener información, se usa por defecto el token de Facebook.
     """
-    # CORRECCIÓN: Usamos el dominio graph.facebook.com y una versión de API reciente.
-    url = f"https://graph.facebook.com/v19.0/{senderID}"
-    
-    # AJUSTE: Simplificado. Usamos un único token para todo.
-    token = config.get("page_access_token")
-    if not token:
-        logging.error("¡ERROR! 'page_access_token' no está configurado en config.json para getContactInfo")
-        return None
-        
-    params = {"fields": "name,profile_pic", "access_token": token}
-    
+    url = f"https://graph.facebook.com/v15.0/{senderID}"
+    token = config.get("access_token_facebook")  # Puedes ajustar esto si es necesario
+    params = {"fields": "name", "access_token": token}
     async with httpx.AsyncClient() as client:
         try:
             res = await client.get(url, params=params)
-            res.raise_for_status()
             return res.json()
-        except httpx.HTTPStatusError as e:
-            logging.error(f"Error obteniendo info de contacto para {senderID}: {e.response.status_code} - {e.response.text}")
-            return None
         except Exception as e:
-            logging.error(f"Error inesperado obteniendo info de contacto: {str(e)}")
+            logging.error(f"Error getting contact info: {str(e)}")
             return None
+
+
 
 # ---------------------------------------------------
 # Ejecución del servidor
