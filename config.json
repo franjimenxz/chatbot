@@ -4,7 +4,7 @@
   "idAplicacion": 13,
   "name": "Helpdesk Geco",
   "lastMessage": "",
-  "webhook_token": "miTokenPersonal",
-    
-  "page_access_token": "EAAFhIdqdFt8BOZCv3LxIis8zHKUUs9tW3VFZCCENWdtwz0YEfdzccf99z7PjmBD4TtpketztXaWyZCVGZAXDnNfkUyBZBkKihZAwCKfQ4r0Ng9YFcVhFICnrAYosn0VH5TE5syqFZCseZB1HaABOaZB1kTwrugKiSrpXCXqazNnsXHBFgFXMACA2RAedpLWcFzJtH1G1RZBDcDpirauS2OYGEcEAZDZD"
+  "webhookToken": "miTokenPersonal",
+  "access_token_facebook": "EAAFhIdqdFt8BOwczlW8IYtbFnMpc4K1Lydz5gNSQKFfnZBG0QosdxUCAZC1SzvNCxLlqKQUirH1uiqbtoKHfqqXEWiX2Petl9ID5rb3UoeNSCokI43OV06Ty0GRiUZCQjM14Gb8ddjAt1NfljMp7E4VJ9xNJPSkDmWCUkgA5wtzckN8mHsDSQlY7gqtyXbnewZA97MYbkwEqFgZDZD",
+  "access_token_instagram": "EAAFhIdqdFt8BOZCv3LxIis8zHKUUs9tW3VFZCCENWdtwz0YEfdzccf99z7PjmBD4TtpketztXaWyZCVGZAXDnNfkUyBZBkKihZAwCKfQ4r0Ng9YFcVhFICnrAYosn0VH5TE5syqFZCseZB1HaABOaZB1kTwrugKiSrpXCXqazNnsXHBFgFXMACA2RAedpLWcFzJtH1G1RZBDcDpirauS2OYGEcEAZDZD"
 }
