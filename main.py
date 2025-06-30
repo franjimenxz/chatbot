@@ -208,7 +208,7 @@ async def sendMessage(senderID: str, mensaje: str, platform: str):
         "recipient": {"id": senderID},
         "message": {"text": mensaje}
     }
-    url = "https://graph.facebook.com/v15.0/me/messages"
+    url = "https://graph.instagram.com/v15.0/me/messages"
     if platform == "page":
         token = config.get("access_token_facebook")
     elif platform == "instagram":
@@ -227,7 +227,7 @@ async def getContactInfo(senderID: str):
     Obtiene la información de contacto del remitente usando la API de Facebook.
     Para obtener información, se usa por defecto el token de Facebook.
     """
-    url = f"https://graph.facebook.com/v15.0/{senderID}"
+    url = f"https://graph.instagram.com/v15.0/{senderID}"
     token = config.get("access_token_instagram")  # Puedes ajustar esto si es necesario
     params = {"fields": "name", "access_token": token}
     async with httpx.AsyncClient() as client:
